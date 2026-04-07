@@ -1,0 +1,9 @@
+fileFormatVersion: 2
+guid: 729b9eb45c2bf9e4b98aa82e733ac3b4
+AssetOrigin:
+  serializedVersion: 1
+  productId: 317001
+  packageName: Field Of View (FOV)
+  packageVersion: 1.0.2
+  assetPath: Assets/FOV/Scripts/Editor/FieldOfViewEditor.cs
+  uploadId: 750231

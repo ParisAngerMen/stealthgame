@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1169579dd0e23684096c05e48c6524bb
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 317001
+  packageName: Field Of View (FOV)
+  packageVersion: 1.0.2
+  assetPath: Assets/FOV/Materials/Red.mat
+  uploadId: 750231

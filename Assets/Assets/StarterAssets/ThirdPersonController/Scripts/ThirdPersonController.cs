@@ -161,6 +161,7 @@ namespace StarterAssets
 
             JumpAndGravity();
             GroundedCheck();
+            Crouch();
             Move();
         }
 
@@ -284,7 +285,25 @@ namespace StarterAssets
 
         private void Crouch()
         {
-            
+            if (Grounded)
+            {
+                if (_input.crouch)
+                {
+                    // Crouch logic
+                    Debug.Log("crouch");
+                    
+                }
+
+                else
+                {
+                    
+                }
+            }
+
+            else
+            {
+                _input.crouch = false;
+            }
         }
 
         private void JumpAndGravity()

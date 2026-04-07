@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 16cc41499c2b45548bbd97d54b5cecd1
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 317001
+  packageName: Field Of View (FOV)
+  packageVersion: 1.0.2
+  assetPath: Assets/FOV/Prefabs/Ground.prefab
+  uploadId: 750231

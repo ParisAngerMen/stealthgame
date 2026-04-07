@@ -48,6 +48,7 @@ namespace StarterAssets
 		public void OnCrouch(InputValue value)
 		{
 			CrouchInput(value.isPressed);
+			Debug.Log("is crocuhing");
 		}
 #endif
 
