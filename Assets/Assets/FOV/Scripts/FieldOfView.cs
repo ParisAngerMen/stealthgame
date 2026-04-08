@@ -48,20 +48,12 @@ namespace FOV
 
                 if (Vector3.Angle(transform.forward, directionToTarget) < angle / 2)
                 {
-                    float distanceToTarget = Vector3.Distance(origin, target.position);  // <-- fixed
+                    float distanceToTarget = Vector3.Distance(origin, target.position); 
 
-                    if (!Physics.Raycast(origin, directionToTarget, distanceToTarget, obstructionMask))  // <-- fixed
+                    if (Physics.Raycast(origin, directionToTarget, distanceToTarget, obstructionMask))  
                     {
-                        if (target.TryGetComponent<T>(out T t))  // <-- proper usage
-                        {
-                            value.Add(t);
-                            Debug.DrawLine(origin, target.position, Color.green);
-                            Debug.Log("Seeing: " + target.name);
-                        }
-                    }
-                    else
-                    {
-                        Debug.DrawLine(origin, target.position, Color.red);
+                        Debug.DrawLine(origin, target.position, Color.green);
+                        Debug.Log("Seeing: " + target.name);
                     }
                 }
             }
