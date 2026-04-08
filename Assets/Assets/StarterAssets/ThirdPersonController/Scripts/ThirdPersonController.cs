@@ -21,6 +21,8 @@ namespace StarterAssets
         [Tooltip("Sprint speed of the character in m/s")]
         public float SprintSpeed = 5.335f;
 
+        public float CrouchSpeed = 1f;
+
         [Tooltip("How fast the character turns to face movement direction")]
         [Range(0.0f, 0.3f)]
         public float RotationSmoothTime = 0.12f;
@@ -290,6 +292,7 @@ namespace StarterAssets
                 if (_input.crouch)
                 {
                     // Crouch logic
+                    
                     Debug.Log("crouch");
                     
                 }

@@ -19,6 +19,13 @@ namespace FOV
 
         // The origin point used for all checks
         private Vector3 Origin => transform.position + offset;
+        private Vector3 playerPos;
+        private GuardAI guard;
+
+        private void Awake()
+        {
+            guard = GetComponent<GuardAI>();
+        }
 
         private void OnValidate()
         {
@@ -37,24 +44,41 @@ namespace FOV
 
             Vector3 origin = Origin;  // <-- use consistent origin
 
-            Collider[] rangeChecks = Physics.OverlapSphere(origin, radius, targetMask);
+            Collider[] rangeChecks = Physics.OverlapSphere(origin, radius, targetMask); // Checks if player in visual range
 
             for (int i = 0; i < rangeChecks.Length; i++)
             {
                 Transform target = rangeChecks[i].transform;
-                Vector3 directionToTarget = (target.position - origin).normalized;  // <-- fixed
+                Vector3 directionToTarget = (target.position - origin).normalized;  
 
-                if (tag != null && !target.CompareTag(tag)) continue;  // <-- CompareTag is better
+                if (tag != null && !target.CompareTag(tag)) continue;
 
-                if (Vector3.Angle(transform.forward, directionToTarget) < angle / 2)
+                if (Vector3.Angle(transform.forward, directionToTarget) < angle / 2) // Checks if player in visual cone
                 {
                     float distanceToTarget = Vector3.Distance(origin, target.position); 
 
-                    if (Physics.Raycast(origin, directionToTarget, distanceToTarget, obstructionMask))  
+                    if (!Physics.Raycast(origin, directionToTarget, distanceToTarget, obstructionMask)) // Checks if there are no obstacles
                     {
+                        playerPos = target.position;
+                        
                         Debug.DrawLine(origin, target.position, Color.green);
                         Debug.Log("Seeing: " + target.name);
+                        guard.Chase(target.gameObject);
+                        
                     }
+
+                    else
+                    {
+                        guard.SearchForPlayer(playerPos);
+                        Debug.DrawLine(origin, playerPos, Color.red);
+                    }
+                    
+                }
+
+                else
+                {
+                    guard.SearchForPlayer(playerPos);
+                    Debug.DrawLine(origin, playerPos, Color.red);
                 }
             }
 
