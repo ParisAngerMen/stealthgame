@@ -160,6 +160,7 @@ namespace StarterAssets
         private void Update()
         {
             _hasAnimator = TryGetComponent(out _animator);
+            Debug.Log("Speed: " + _speed);
 
             JumpAndGravity();
             GroundedCheck();
@@ -221,6 +222,7 @@ namespace StarterAssets
         {
             // set target speed based on move speed, sprint speed and if sprint is pressed
             float targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
+            targetSpeed = _input.crouch ? CrouchSpeed : targetSpeed;
 
             // a simplistic acceleration and deceleration designed to be easy to remove, replace, or iterate upon
 
@@ -292,6 +294,7 @@ namespace StarterAssets
                 if (_input.crouch)
                 {
                     // Crouch logic
+                    _speed = CrouchSpeed;
                     
                     Debug.Log("crouch");
                     

@@ -1572,6 +1572,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 735668326}
     - target: {fileID: 4416926081852918490, guid: 64dce48905ffd9b4293e595fa6941544, type: 3}
+      propertyPath: CrouchSpeed
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4416926081852918490, guid: 64dce48905ffd9b4293e595fa6941544, type: 3}
       propertyPath: SprintSpeed
       value: 10
       objectReference: {fileID: 0}
@@ -2056,7 +2060,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1983617561}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c4650c9812b8ff348b52c1bd263c6e0f, type: 3}
   m_Name: 
@@ -2066,8 +2070,8 @@ MonoBehaviour:
   - {fileID: 394434734}
   - {fileID: 356378209}
   - {fileID: 1708133062}
-  isChasing: 1
   timeToWaitPatrol: 2
+  rotateDuration: 2
 --- !u!195 &1983617568
 NavMeshAgent:
   m_ObjectHideFlags: 0

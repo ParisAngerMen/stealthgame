@@ -75,11 +75,13 @@ namespace FOV
                     
                 }
 
+                /*
                 else
                 {
                     guard.SearchForPlayer(playerPos);
                     Debug.DrawLine(origin, playerPos, Color.red);
                 }
+                */
             }
 
             return value;
