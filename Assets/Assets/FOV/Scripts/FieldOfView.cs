@@ -52,7 +52,7 @@ namespace FOV
                 Vector3 directionToTarget = (target.position - origin).normalized;  
 
                 if (tag != null && !target.CompareTag(tag)) continue;
-
+                
                 if (Vector3.Angle(transform.forward, directionToTarget) < angle / 2) // Checks if player in visual cone
                 {
                     float distanceToTarget = Vector3.Distance(origin, target.position); 

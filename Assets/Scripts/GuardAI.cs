@@ -1,178 +1,9 @@
-/*
 using System;
 using System.Collections;
 using UnityEngine;
 using FOV;
 using UnityEngine.AI;
-
-public class GuardAI : MonoBehaviour
-{
-    private FieldOfView fov;
-    private NavMeshAgent agent;
-    public Transform[] waypoints;
-
-    private GameObject player;
-    
-    private bool isPatrolling = true;
-    private bool isSearching = false;
-    private bool isRotating = false;
-
-    private bool isChasing = false;
-    
-    private int waypointIndex = 0;
-
-    [SerializeField] private float timeToWaitPatrol = 5f;
-    private float waitTimer;
-    
-    private void Awake()
-    {
-        fov = GetComponent<FieldOfView>();
-        agent = GetComponent<NavMeshAgent>();
-        
-    }
-
-    void Start()
-    {
-        agent.SetDestination(waypoints[waypointIndex].position);
-    }
-
-    void Update()
-    {
-        // Update player detection
-        var detectedTargets = fov.Field<Transform>("Player");
-        // 
-        if (agent.remainingDistance <= agent.stoppingDistance && isPatrolling)
-        {
-            Debug.Log("reached");
-            
-            StopPatrol();
-        }
-
-        if (isSearching)
-        {
-            Rotate(2);
-        }
-        
-    }
-
-    void Patrol()
-    {
-        isPatrolling = true;
-
-        // Change to next patrol
-        if (waypointIndex >= waypoints.Length)
-        {
-            waypointIndex = 0;
-        }
-
-        // Reset patrol points if final one has been reached
-        else
-        {
-            waypointIndex++;
-        }
-
-        if (waypointIndex <= waypoints.Length - 1)
-        {
-            agent.SetDestination(waypoints[waypointIndex].position);
-        }
-        
-    }
-
-    private void StopPatrol()
-    {
-        if (!isPatrolling)
-        {
-            Debug.Log("Stopping patrol");
-        
-            agent.isStopped = true;
-
-            if (waitTimer < timeToWaitPatrol && !isPatrolling)
-            {
-                waitTimer += Time.deltaTime;
-            }
-        
-            agent.isStopped = false; 
-            isSearching = false;
-        
-            Patrol(); 
-        }
-
-
-    }
-
-    public void Chase(GameObject target)
-    {
-        player = target;
-        
-        isPatrolling = false;
-        isChasing = true;
-        agent.SetDestination(target.transform.position);
-        
-        if (agent.remainingDistance <= agent.stoppingDistance)
-        {
-            Attack();
-        }
-    }
-
-    void Attack()
-    {
-        // Once in range, attack player
-    }
-
-    public void SearchForPlayer(Vector3 lastKnownPos)
-    {
-        isChasing = false;
-        // Search last known pos
-        agent.SetDestination(lastKnownPos);
-        
-        // Search for a while
-        if (!isChasing && agent.remainingDistance <= agent.stoppingDistance && !isSearching && !isRotating)
-        {
-            Debug.Log("Searching for player");
-            Rotate(2);
-            isRotating = true;
-            //StartCoroutine(StopPatrol());
-        }
-        
-        // Return 
-        
-    }
-    
-    public void Rotate(float duration)
-    {
-        if (isRotating)
-        {
-            isSearching = true;
-            float startRotation = transform.eulerAngles.y;
-            float endRotation = startRotation + 360.0f;
-
-            if (waitTimer < duration)
-            {
-                waitTimer += Time.deltaTime;
-                float yRotation = Mathf.Lerp(startRotation, endRotation, duration * Time.deltaTime) % 360.0f;
-                transform.eulerAngles = new Vector3(transform.eulerAngles.x, yRotation, transform.eulerAngles.z);
-                Debug.Log("Time: " + waitTimer);
-            }
-            
-            isSearching = false;
-            isPatrolling = false;
-            
-            StopPatrol(); 
-            Debug.Log("isRotating:" + isRotating);
-
-            isRotating = false;
-        
-        }
-
-    }
-}
-*/
-
-using System;
-using System.Collections;
-using UnityEngine;
-using FOV;
-using UnityEngine.AI;
+using Random = UnityEngine.Random;
 
 public class GuardAI : MonoBehaviour
 {
@@ -188,17 +19,20 @@ public class GuardAI : MonoBehaviour
         Waiting,
         Chasing,
         Searching,
-        Rotating
+        Investigating
     }
     
     private GuardState currentState = GuardState.Patrolling;
     
     private int waypointIndex = 0;
 
+    private bool hasSearchPoint = false;
+    
     [SerializeField] private float timeToWaitPatrol = 5f;
     [SerializeField] private float rotateDuration = 2f;
+    [SerializeField] private float searchArea = 3f;
     private float waitTimer;
-    private float rotateTimer;
+    private float searchTimer;
     private float startRotationY;
     private float searchCooldown = 0f;
 
@@ -217,6 +51,7 @@ public class GuardAI : MonoBehaviour
 
     void Update()
     {
+        Debug.Log("CurrentState: " + currentState);
         // Update player detection
         var detectedTargets = fov.Field<Transform>("Player");
         
@@ -262,15 +97,15 @@ public class GuardAI : MonoBehaviour
                 if (agent.remainingDistance <= agent.stoppingDistance && !agent.pathPending)
                 {
                     Debug.Log("Searching for player");
-                    currentState = GuardState.Rotating;
-                    rotateTimer = 0f;
+                    currentState = GuardState.Investigating;
+                    searchTimer = 0f;
                     startRotationY = transform.eulerAngles.y;
                     agent.isStopped = true;
                 }
                 break;
 
-            case GuardState.Rotating:
-                Rotate(rotateDuration);
+            case GuardState.Investigating:
+                SearchRadius(10f);                
                 break;
         }
     }
@@ -309,8 +144,10 @@ public class GuardAI : MonoBehaviour
 
     public void SearchForPlayer(Vector3 pos)
     {
+        if (agent.pathPending) agent.isStopped = true;
+        
         if (searchCooldown > 0f) return;
-        if (currentState == GuardState.Searching || currentState == GuardState.Rotating) return;
+        if (currentState == GuardState.Searching || currentState == GuardState.Investigating) return;
         
         lastKnownPos = pos;
         currentState = GuardState.Searching;
@@ -318,21 +155,48 @@ public class GuardAI : MonoBehaviour
         agent.SetDestination(lastKnownPos);
     }
     
-    public void Rotate(float duration)
+    public void SearchRadius(float duration)
     {
-        rotateTimer += Time.deltaTime;
-        
-        float progress = rotateTimer / duration;
-        float yRotation = Mathf.Lerp(startRotationY, startRotationY + 360f, progress) % 360f;
-        transform.eulerAngles = new Vector3(transform.eulerAngles.x, yRotation, transform.eulerAngles.z);
-        
-        Debug.Log("Time: " + rotateTimer);
+        searchTimer += Time.deltaTime;
 
-        if (rotateTimer >= duration)
+        if (!hasSearchPoint)
         {
+            Vector2 randomCircle = Random.insideUnitCircle * searchArea;
+            Vector3 searchPoint = new Vector3(
+                transform.position.x + randomCircle.x,
+                transform.position.y,
+                transform.position.z + randomCircle.y);
+            
             agent.isStopped = false;
+            agent.SetDestination(searchPoint);
+            hasSearchPoint = true;
+
+        }
+        
+        if (agent.remainingDistance <= agent.stoppingDistance && !agent.pathPending)
+        {
+            hasSearchPoint = false;  // Get new point next frame
+        }
+        
+        Debug.Log("Time: " + searchTimer);
+
+        if (searchTimer >= duration)
+        {
+            agent.isStopped = true;
             searchCooldown = 2f;
+            hasSearchPoint = false;
             currentState = GuardState.Waiting;
         }
+    }
+
+    private void OnTriggerStay(Collider other)
+    {
+        if (other.CompareTag("Player"))
+        {
+            currentState = GuardState.Searching;
+            SearchForPlayer(other.transform.position);
+            Debug.Log("HearingPLayer");
+        }
+
     }
 }

@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using Unity.Mathematics;
+using UnityEngine;
 #if ENABLE_INPUT_SYSTEM 
 using UnityEngine.InputSystem;
 #endif
@@ -35,6 +36,7 @@ namespace StarterAssets
         public AudioSource AudioFoley;
         public AudioClip LandingAudioClip;
         public AudioClip[] FootstepAudioClips;
+        
         [Range(0, 1)] public float FootstepAudioVolume = 0.5f;
 
         [Space(10)]
@@ -61,6 +63,9 @@ namespace StarterAssets
         [Tooltip("The radius of the grounded check. Should match the radius of the CharacterController")]
         public float GroundedRadius = 0.28f;
 
+        private float noiseRadius;
+        public float noiseMultiplier = 2.0f;
+
         [Tooltip("What layers the character uses as ground")]
         public LayerMask GroundLayers;
 
@@ -79,6 +84,8 @@ namespace StarterAssets
 
         [Tooltip("For locking the camera position on all axis")]
         public bool LockCameraPosition = false;
+
+        public bool isMakingNoise;
 
         // cinemachine
         private float _cinemachineTargetYaw;
@@ -110,6 +117,7 @@ namespace StarterAssets
         private CharacterController _controller;
         private StarterAssetsInputs _input;
         private GameObject _mainCamera;
+        private CapsuleCollider _capsuleCollider;
 
         private const float _threshold = 0.01f;
 
@@ -135,6 +143,7 @@ namespace StarterAssets
             {
                 _mainCamera = GameObject.FindGameObjectWithTag("MainCamera");
             }
+
         }
 
         private void Start()
@@ -144,6 +153,7 @@ namespace StarterAssets
             _hasAnimator = TryGetComponent(out _animator);
             _controller = GetComponent<CharacterController>();
             _input = GetComponent<StarterAssetsInputs>();
+            _capsuleCollider = GetComponent<CapsuleCollider>();
 #if ENABLE_INPUT_SYSTEM 
             _playerInput = GetComponent<PlayerInput>();
 #else
@@ -166,6 +176,7 @@ namespace StarterAssets
             GroundedCheck();
             Crouch();
             Move();
+            EmitNoise();
         }
 
         private void LateUpdate()
@@ -285,6 +296,17 @@ namespace StarterAssets
                 _animator.SetFloat(_animIDSpeed, _animationBlend);
                 _animator.SetFloat(_animIDMotionSpeed, inputMagnitude);
             }
+
+            if (targetSpeed <= CrouchSpeed)
+            {
+                noiseRadius = 0;
+            }
+
+            else
+            {
+                noiseRadius = _speed * noiseMultiplier;
+            }
+            
         }
 
         private void Crouch()
@@ -381,6 +403,11 @@ namespace StarterAssets
             }
         }
 
+        private void EmitNoise()
+        {
+            _capsuleCollider.radius = noiseRadius;
+        }
+
         private static float ClampAngle(float lfAngle, float lfMin, float lfMax)
         {
             if (lfAngle < -360f) lfAngle += 360f;
@@ -399,7 +426,12 @@ namespace StarterAssets
             // when selected, draw a gizmo in the position of, and matching radius of, the grounded collider
             Gizmos.DrawSphere(
                 new Vector3(transform.position.x, transform.position.y - GroundedOffset, transform.position.z),
-                GroundedRadius);
+                GroundedRadius);            
+            
+            Gizmos.DrawSphere(
+                new Vector3(transform.position.x, transform.position.y - GroundedOffset, transform.position.z),
+                noiseRadius);
+            
         }
 
         private void OnFootstep(AnimationEvent animationEvent)
@@ -409,6 +441,7 @@ namespace StarterAssets
 
                 if (AudioFootsteps != null)
                     AudioFootsteps.Play();
+                
                 if (AudioFoley != null)
                     AudioFoley.Play();
             }
@@ -423,5 +456,6 @@ namespace StarterAssets
 
             }
         }
+        
     }
 }

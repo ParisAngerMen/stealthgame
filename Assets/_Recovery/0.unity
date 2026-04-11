@@ -2140,7 +2140,7 @@ MonoBehaviour:
   - {fileID: 1708133062}
   timeToWaitPatrol: 2
   rotateDuration: 2
-  searchArea: 10
+  searchArea: 300
 --- !u!195 &1983617568
 NavMeshAgent:
   m_ObjectHideFlags: 0
