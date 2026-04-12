@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using UnityEngine;
 using FOV;
 using UnityEngine.AI;
@@ -7,12 +6,35 @@ using Random = UnityEngine.Random;
 
 public class GuardAI : MonoBehaviour
 {
+    #region Variables
     private FieldOfView fov;
     private NavMeshAgent agent;
-    public Transform[] waypoints;
-
     private GameObject player;
-    
+
+    [Header("Waypoints")]
+    public Transform[] waypoints;
+    private int waypointIndex = 0;
+
+    [Header("Timers")]
+    [SerializeField] private float timeToWaitPatrol = 5f;
+    [SerializeField] private float searchDuration = 10f;
+    [SerializeField] private float searchCooldownDuration = 2f;
+    [SerializeField] private float hearingCooldownDuration = 1f;
+
+    [Header("Search")]
+    [SerializeField] private float searchArea = 5f;
+
+    // Timers
+    private float waitTimer = 0f;
+    private float searchTimer = 0f;
+    private float searchCooldown = 0f;
+    private float hearingCooldown = 0f;
+
+    // Search
+    private bool hasSearchPoint = false;
+    private Vector3 lastKnownPos;
+
+    // State
     private enum GuardState
     {
         Patrolling,
@@ -21,182 +43,264 @@ public class GuardAI : MonoBehaviour
         Searching,
         Investigating
     }
-    
+
     private GuardState currentState = GuardState.Patrolling;
-    
-    private int waypointIndex = 0;
+    #endregion
 
-    private bool hasSearchPoint = false;
-    
-    [SerializeField] private float timeToWaitPatrol = 5f;
-    [SerializeField] private float rotateDuration = 2f;
-    [SerializeField] private float searchArea = 3f;
-    private float waitTimer;
-    private float searchTimer;
-    private float startRotationY;
-    private float searchCooldown = 0f;
-
-    private Vector3 lastKnownPos;
-    
+    #region Unity Methods
     private void Awake()
     {
         fov = GetComponent<FieldOfView>();
+        if (fov == null) Debug.LogError("FieldOfView component missing on " + gameObject.name);
+
         agent = GetComponent<NavMeshAgent>();
+        if (agent == null) Debug.LogError("NavMeshAgent component missing on " + gameObject.name);
     }
 
-    void Start()
+    private void Start()
     {
-        agent.SetDestination(waypoints[waypointIndex].position);
+        if (waypoints == null || waypoints.Length == 0)
+        {
+            Debug.LogError("No waypoints assigned to " + gameObject.name);
+            return;
+        }
+
+        GoToWaypoint();
     }
 
-    void Update()
+    private void Update()
     {
-        Debug.Log("CurrentState: " + currentState);
-        // Update player detection
-        var detectedTargets = fov.Field<Transform>("Player");
-        
-        if (searchCooldown > 0f)
-        {
-            searchCooldown -= Time.deltaTime;
-        }
+        // Tick cooldowns
+        if (searchCooldown > 0f) searchCooldown -= Time.deltaTime;
+        if (hearingCooldown > 0f) hearingCooldown -= Time.deltaTime;
 
-        switch (currentState)
-        {
-            case GuardState.Patrolling:
-                if (agent.remainingDistance <= agent.stoppingDistance && !agent.pathPending)
-                {
-                    Debug.Log("reached");
-                    currentState = GuardState.Waiting;
-                    waitTimer = 0f;
-                    agent.isStopped = true;
-                }
-                break;
+        // Update FOV detection every frame
+        fov.Field<Transform>("Player");
 
-            case GuardState.Waiting:
-                waitTimer += Time.deltaTime;
-                if (waitTimer >= timeToWaitPatrol)
-                {
-                    agent.isStopped = false;
-                    Patrol();
-                    currentState = GuardState.Patrolling;
-                }
-                break;
-
-            case GuardState.Chasing:
-                if (player != null)
-                {
-                    agent.SetDestination(player.transform.position);
-                    if (agent.remainingDistance <= agent.stoppingDistance && !agent.pathPending)
-                    {
-                        Attack();
-                    }
-                }
-                break;
-
-            case GuardState.Searching:
-                if (agent.remainingDistance <= agent.stoppingDistance && !agent.pathPending)
-                {
-                    Debug.Log("Searching for player");
-                    currentState = GuardState.Investigating;
-                    searchTimer = 0f;
-                    startRotationY = transform.eulerAngles.y;
-                    agent.isStopped = true;
-                }
-                break;
-
-            case GuardState.Investigating:
-                SearchRadius(10f);                
-                break;
-        }
-    }
-
-    void Patrol()
-    {
-        if (waypointIndex >= waypoints.Length)
-        {
-            waypointIndex = 0;
-        }
-        else
-        {
-            waypointIndex++;
-        }
-
-        if (waypointIndex <= waypoints.Length - 1)
-        {
-            agent.SetDestination(waypoints[waypointIndex].position);
-        }
-
-        // Change to next patrol
-
-    }
-
-    public void Chase(GameObject target)
-    {
-        player = target;
-        currentState = GuardState.Chasing;
-        agent.isStopped = false;
-    }
-
-    void Attack()
-    {
-        // Once in range, attack player
-    }
-
-    public void SearchForPlayer(Vector3 pos)
-    {
-        if (agent.pathPending) agent.isStopped = true;
-        
-        if (searchCooldown > 0f) return;
-        if (currentState == GuardState.Searching || currentState == GuardState.Investigating) return;
-        
-        lastKnownPos = pos;
-        currentState = GuardState.Searching;
-        agent.isStopped = false;
-        agent.SetDestination(lastKnownPos);
-    }
-    
-    public void SearchRadius(float duration)
-    {
-        searchTimer += Time.deltaTime;
-
-        if (!hasSearchPoint)
-        {
-            Vector2 randomCircle = Random.insideUnitCircle * searchArea;
-            Vector3 searchPoint = new Vector3(
-                transform.position.x + randomCircle.x,
-                transform.position.y,
-                transform.position.z + randomCircle.y);
-            
-            agent.isStopped = false;
-            agent.SetDestination(searchPoint);
-            hasSearchPoint = true;
-
-        }
-        
-        if (agent.remainingDistance <= agent.stoppingDistance && !agent.pathPending)
-        {
-            hasSearchPoint = false;  // Get new point next frame
-        }
-        
-        Debug.Log("Time: " + searchTimer);
-
-        if (searchTimer >= duration)
-        {
-            agent.isStopped = true;
-            searchCooldown = 2f;
-            hasSearchPoint = false;
-            currentState = GuardState.Waiting;
-        }
+        HandleState();
     }
 
     private void OnTriggerStay(Collider other)
     {
-        if (other.CompareTag("Player"))
+        // Cooldown prevents spam calling every frame
+        if (hearingCooldown > 0f) return;
+        if (!other.CompareTag("Player")) return;
+
+        // Dont interrupt chase or investigate
+        if (currentState == GuardState.Chasing) return;
+        if (currentState == GuardState.Investigating) return;
+
+        hearingCooldown = hearingCooldownDuration;
+        Debug.Log("Hearing player!");
+        SearchForPlayer(other.transform.position);
+    }
+    #endregion
+
+    #region State Machine
+    private void HandleState()
+    {
+        switch (currentState)
         {
+            case GuardState.Patrolling:
+                HandlePatrolling();
+                break;
+
+            case GuardState.Waiting:
+                HandleWaiting();
+                break;
+
+            case GuardState.Chasing:
+                HandleChasing();
+                break;
+
+            case GuardState.Searching:
+                HandleSearching();
+                break;
+
+            case GuardState.Investigating:
+                HandleInvestigating();
+                break;
+        }
+    }
+
+    private void HandlePatrolling()
+    {
+        // Path not ready yet, wait
+        if (agent.pathPending) return;
+
+        if (agent.remainingDistance <= agent.stoppingDistance)
+        {
+            Debug.Log("Reached waypoint, waiting...");
+            waitTimer = 0f;
+            agent.isStopped = true;
+            currentState = GuardState.Waiting;
+        }
+    }
+
+    private void HandleWaiting()
+    {
+        waitTimer += Time.deltaTime;
+
+        if (waitTimer >= timeToWaitPatrol)
+        {
+            Debug.Log("Done waiting, patrolling...");
+            agent.isStopped = false;
+            NextWaypoint();
+            currentState = GuardState.Patrolling;
+        }
+    }
+
+    private void HandleChasing()
+    {
+        // Player went missing
+        if (player == null)
+        {
+            Debug.Log("Lost player reference, searching...");
             currentState = GuardState.Searching;
-            SearchForPlayer(other.transform.position);
-            Debug.Log("HearingPLayer");
+            return;
         }
 
+        agent.SetDestination(player.transform.position);
+
+        // Path not ready yet, wait
+        if (agent.pathPending) return;
+
+        if (agent.remainingDistance <= agent.stoppingDistance)
+        {
+            Attack();
+        }
     }
+
+    private void HandleSearching()
+    {
+        // Path not ready yet, wait
+        if (agent.pathPending) return;
+
+        if (agent.remainingDistance <= agent.stoppingDistance)
+        {
+            Debug.Log("Reached last known position, investigating...");
+            searchTimer = 0f;
+            hasSearchPoint = false;
+            agent.isStopped = true;
+            currentState = GuardState.Investigating;
+        }
+    }
+
+    private void HandleInvestigating()
+    {
+        searchTimer += Time.deltaTime;
+
+        // Pick a new random nearby point to walk to
+        if (!hasSearchPoint)
+        {
+            Vector3 searchPoint;
+
+            // Make sure point is on NavMesh
+            if (GetRandomNavMeshPoint(out searchPoint))
+            {
+                agent.isStopped = false;
+                agent.SetDestination(searchPoint);
+                hasSearchPoint = true;
+                Debug.Log("Going to search point: " + searchPoint);
+            }
+            else
+            {
+                // Could not find valid point, try again next frame
+                Debug.LogWarning("Could not find valid NavMesh search point, retrying...");
+            }
+        }
+
+        // Reached search point, get a new one next frame
+        if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
+        {
+            hasSearchPoint = false;
+        }
+
+        // Search time is up, return to patrol
+        if (searchTimer >= searchDuration)
+        {
+            Debug.Log("Search complete, returning to patrol...");
+            agent.isStopped = false;
+            hasSearchPoint = false;
+            searchCooldown = searchCooldownDuration;
+            NextWaypoint();
+            currentState = GuardState.Patrolling;
+        }
+    }
+    #endregion
+
+    #region Actions
+    private void GoToWaypoint()
+    {
+        if (waypoints.Length == 0) return;
+
+        agent.isStopped = false;
+        agent.SetDestination(waypoints[waypointIndex].position);
+    }
+
+    private void NextWaypoint()
+    {
+        waypointIndex++;
+
+        if (waypointIndex >= waypoints.Length)
+        {
+            waypointIndex = 0;
+        }
+
+        GoToWaypoint();
+    }
+
+    public void Chase(GameObject target)
+    {
+        if (target == null) return;
+
+        player = target;
+        agent.isStopped = false;
+        currentState = GuardState.Chasing;
+        Debug.Log("Chasing player!");
+    }
+
+    private void Attack()
+    {
+        // Once in range, attack player
+        Debug.Log("Attacking player!");
+    }
+
+    public void SearchForPlayer(Vector3 pos)
+    {
+        if (searchCooldown > 0f) return;
+        if (currentState == GuardState.Searching) return;
+        if (currentState == GuardState.Investigating) return;
+
+        lastKnownPos = pos;
+        agent.isStopped = false;
+        agent.SetDestination(lastKnownPos);
+        currentState = GuardState.Searching;
+        Debug.Log("Searching for player at: " + lastKnownPos);
+    }
+
+    private bool GetRandomNavMeshPoint(out Vector3 result)
+    {
+        // Try a few times to find a valid point on the NavMesh
+        for (int i = 0; i < 5; i++)
+        {
+            Vector2 randomCircle = Random.insideUnitCircle * searchArea;
+            Vector3 randomPoint = new Vector3(
+                transform.position.x + randomCircle.x,
+                transform.position.y,
+                transform.position.z + randomCircle.y
+            );
+
+            NavMeshHit hit;
+            if (NavMesh.SamplePosition(randomPoint, out hit, searchArea, NavMesh.AllAreas))
+            {
+                result = hit.position;
+                return true;
+            }
+        }
+
+        result = transform.position;
+        return false;
+    }
+    #endregion
 }
