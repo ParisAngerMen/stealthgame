@@ -86,6 +86,9 @@ namespace StarterAssets
         public bool LockCameraPosition = false;
 
         public bool isMakingNoise;
+        public float interactCooldown = 1.0f;
+        public float interactRadius = 10.0f;
+
 
         // cinemachine
         private float _cinemachineTargetYaw;
@@ -98,6 +101,7 @@ namespace StarterAssets
         private float _rotationVelocity;
         private float _verticalVelocity;
         private float _terminalVelocity = 53.0f;
+        private float _interactTimer = 0.0f;
 
         // timeout deltatime
         private float _jumpTimeoutDelta;
@@ -170,13 +174,13 @@ namespace StarterAssets
         private void Update()
         {
             _hasAnimator = TryGetComponent(out _animator);
-            Debug.Log("Speed: " + _speed);
 
             JumpAndGravity();
             GroundedCheck();
             Crouch();
             Move();
             EmitNoise();
+            Interact();
         }
 
         private void LateUpdate()
@@ -455,6 +459,27 @@ namespace StarterAssets
                     LandingAudio.Play();
 
             }
+        }
+
+        public void Interact()
+        {
+            _interactTimer += Time.deltaTime;
+            
+            if (_input.interact && _interactTimer >= interactCooldown)
+            {
+                // Project sphere
+                
+                
+                
+                // Get colliders
+                
+                Debug.Log("Interact");
+                
+                // Disable the interact
+                _input.interact = false;
+                _interactTimer = 0.0f;
+            }
+
         }
         
     }

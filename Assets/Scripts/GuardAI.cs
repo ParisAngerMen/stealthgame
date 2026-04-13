@@ -19,6 +19,7 @@ public class GuardAI : MonoBehaviour
     [SerializeField] private float timeToWaitPatrol = 5f;
     [SerializeField] private float searchDuration = 10f;
     [SerializeField] private float searchCooldownDuration = 2f;
+    [SerializeField] private float chaseDuration = 5f;
     [SerializeField] private float hearingCooldownDuration = 1f;
 
     [Header("Search")]
@@ -27,11 +28,13 @@ public class GuardAI : MonoBehaviour
     // Timers
     private float waitTimer = 0f;
     private float searchTimer = 0f;
+    public float chaseTimer = 0f;
     private float searchCooldown = 0f;
     private float hearingCooldown = 0f;
 
     // Search
     private bool hasSearchPoint = false;
+    public bool isChasingPlayer = false;
     private Vector3 lastKnownPos;
 
     // State
@@ -78,6 +81,7 @@ public class GuardAI : MonoBehaviour
         fov.Field<Transform>("Player");
 
         HandleState();
+        Debug.Log("chase timer: " + chaseTimer);
     }
 
     private void OnTriggerStay(Collider other)
@@ -92,7 +96,7 @@ public class GuardAI : MonoBehaviour
 
         hearingCooldown = hearingCooldownDuration;
         Debug.Log("Hearing player!");
-        SearchForPlayer(other.transform.position);
+        agent.SetDestination(other.transform.position);
     }
     #endregion
 
@@ -152,11 +156,16 @@ public class GuardAI : MonoBehaviour
 
     private void HandleChasing()
     {
+        chaseTimer += Time.deltaTime;
+
         // Player went missing
-        if (player == null)
+        if (player == null || chaseTimer >= chaseDuration)
         {
+            isChasingPlayer = false;
+            agent.isStopped = true;
             Debug.Log("Lost player reference, searching...");
-            currentState = GuardState.Searching;
+            currentState = GuardState.Investigating;
+            chaseTimer = 0f;
             return;
         }
 
@@ -254,6 +263,7 @@ public class GuardAI : MonoBehaviour
     {
         if (target == null) return;
 
+        isChasingPlayer = true;
         player = target;
         agent.isStopped = false;
         currentState = GuardState.Chasing;
@@ -262,6 +272,7 @@ public class GuardAI : MonoBehaviour
 
     private void Attack()
     {
+        
         // Once in range, attack player
         Debug.Log("Attacking player!");
     }

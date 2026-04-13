@@ -62,6 +62,7 @@ namespace FOV
                         playerPos = target.position;
                         
                         Debug.DrawLine(origin, target.position, Color.green);
+                        guard.chaseTimer = 0f;
                         Debug.Log("Seeing: " + target.name);
                         guard.Chase(target.gameObject);
                         
