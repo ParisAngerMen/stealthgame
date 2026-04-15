@@ -24,17 +24,22 @@ public class GuardAI : MonoBehaviour
 
     [Header("Search")]
     [SerializeField] private float searchArea = 5f;
+    public float chaseTimer = 0f;
+    public bool isChasingPlayer = false;
+
+    [Header("Attack")] 
+    [SerializeField] private float attackDamage = 10f;
+    [SerializeField] private float attackCooldown = 5f;
 
     // Timers
     private float waitTimer = 0f;
     private float searchTimer = 0f;
-    public float chaseTimer = 0f;
     private float searchCooldown = 0f;
     private float hearingCooldown = 0f;
+    private float attackTimer = 0f;
 
     // Search
     private bool hasSearchPoint = false;
-    public bool isChasingPlayer = false;
     private Vector3 lastKnownPos;
 
     // State
@@ -171,11 +176,15 @@ public class GuardAI : MonoBehaviour
 
         agent.SetDestination(player.transform.position);
 
+        attackTimer += Time.deltaTime;
+
+        
         // Path not ready yet, wait
         if (agent.pathPending) return;
 
         if (agent.remainingDistance <= agent.stoppingDistance)
         {
+            Debug.Log("can attack");
             Attack();
         }
     }
@@ -272,9 +281,16 @@ public class GuardAI : MonoBehaviour
 
     private void Attack()
     {
+        Debug.Log("Attack Timer: " + attackTimer);
+        
+        if (attackTimer >= attackCooldown)
+        {
+            Debug.Log("Attacking player!");
+            attackTimer = 0;
+            player.GetComponent<PlayerHealth>().TakeDamage(attackDamage);
+        }
         
         // Once in range, attack player
-        Debug.Log("Attacking player!");
     }
 
     public void SearchForPlayer(Vector3 pos)

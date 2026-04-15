@@ -468,7 +468,11 @@ namespace StarterAssets
             if (_input.interact && _interactTimer >= interactCooldown)
             {
                 // Project sphere
-                
+                Ray r = new Ray(transform.position, transform.forward);
+                if (Physics.Raycast(r, out RaycastHit hit, interactRadius))
+                {
+                    
+                }
                 
                 
                 // Get colliders
