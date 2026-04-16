@@ -89,6 +89,8 @@ namespace StarterAssets
         public float interactCooldown = 1.0f;
         public float interactRadius = 10.0f;
 
+        [Header("LayerMasks")] [Tooltip("The layers that the player will use to interact with")] 
+        [SerializeField] private LayerMask interactMask;
 
         // cinemachine
         private float _cinemachineTargetYaw;
@@ -467,13 +469,25 @@ namespace StarterAssets
             
             if (_input.interact && _interactTimer >= interactCooldown)
             {
-                // Project sphere
-                Ray r = new Ray(transform.position, transform.forward);
-                if (Physics.Raycast(r, out RaycastHit hit, interactRadius))
-                {
-                    
-                }
                 
+                // Project sphere
+                if (Physics.Raycast(transform.position, transform.forward, out RaycastHit hit, interactRadius, interactMask))
+                {
+                    if (hit.collider.gameObject.GetComponent<IInteractable>() != null)
+                    {
+                        hit.collider.gameObject.GetComponent<IInteractable>().Interact();    
+                    }
+                    
+                    else
+                    {
+                        Debug.Log("Interact:" + hit.collider.gameObject.name);
+                    }
+                }
+
+                else
+                {
+                    Debug.Log("cockout");
+                }
                 
                 // Get colliders
                 
