@@ -1,5 +1,6 @@
 ﻿using Unity.Mathematics;
 using UnityEngine;
+using UnityEngine.Serialization;
 #if ENABLE_INPUT_SYSTEM 
 using UnityEngine.InputSystem;
 #endif
@@ -89,8 +90,9 @@ namespace StarterAssets
         public float interactCooldown = 1.0f;
         public float interactRadius = 10.0f;
 
-        [Header("LayerMasks")] [Tooltip("The layers that the player will use to interact with")] 
+        [Header("Interaction")] [Tooltip("To interact with")] 
         [SerializeField] private LayerMask interactMask;
+        [SerializeField] private Transform interactTransform;
 
         // cinemachine
         private float _cinemachineTargetYaw;
@@ -123,7 +125,7 @@ namespace StarterAssets
         private CharacterController _controller;
         private StarterAssetsInputs _input;
         private GameObject _mainCamera;
-        private CapsuleCollider _capsuleCollider;
+        public CapsuleCollider _noiseCollider;
 
         private const float _threshold = 0.01f;
 
@@ -159,7 +161,6 @@ namespace StarterAssets
             _hasAnimator = TryGetComponent(out _animator);
             _controller = GetComponent<CharacterController>();
             _input = GetComponent<StarterAssetsInputs>();
-            _capsuleCollider = GetComponent<CapsuleCollider>();
 #if ENABLE_INPUT_SYSTEM 
             _playerInput = GetComponent<PlayerInput>();
 #else
@@ -411,7 +412,7 @@ namespace StarterAssets
 
         private void EmitNoise()
         {
-            _capsuleCollider.radius = noiseRadius;
+            _noiseCollider.radius = noiseRadius;
         }
 
         private static float ClampAngle(float lfAngle, float lfMin, float lfMax)
@@ -466,38 +467,104 @@ namespace StarterAssets
         public void Interact()
         {
             _interactTimer += Time.deltaTime;
-            
+
             if (_input.interact && _interactTimer >= interactCooldown)
             {
-                
-                // Project sphere
-                if (Physics.Raycast(transform.position, transform.forward, out RaycastHit hit, interactRadius, interactMask))
+                // Get all colliders in range
+                Collider[] colliders = Physics.OverlapSphere(
+                    interactTransform.position + interactTransform.forward * interactRadius,
+                    interactRadius,
+                    interactMask
+                );
+
+                // Debug how many were found
+                Debug.Log("Colliders found: " + colliders.Length);
+
+                if (colliders.Length > 0)
                 {
-                    if (hit.collider.gameObject.GetComponent<IInteractable>() != null)
+                    // Find closest interactable
+                    float closestDistance = Mathf.Infinity;
+                    IInteractable closestInteractable = null;
+
+                    foreach (Collider col in colliders)
                     {
-                        hit.collider.gameObject.GetComponent<IInteractable>().Interact();    
-                    }
+                        // Check if it has IInteractable
+                        if (col.TryGetComponent<IInteractable>(out IInteractable interactable))
+                        {
+                            float distance = Vector3.Distance(transform.position, col.transform.position);
+
+                            if (distance < closestDistance)
+                            {
+                                closestDistance = distance;
+                                closestInteractable = interactable;
+                            }
                     
-                    else
+                            Debug.Log("Found interactable: " + col.gameObject.name);
+                        }
+                        else
+                        {
+                            Debug.Log("Not interactable: " + col.gameObject.name + 
+                                      " on layer: " + LayerMask.LayerToName(col.gameObject.layer));
+                        }
+                    }
+
+                    // Interact with closest
+                    if (closestInteractable != null)
                     {
-                        Debug.Log("Interact:" + hit.collider.gameObject.name);
+                        closestInteractable.Interact();
                     }
                 }
-
                 else
                 {
-                    Debug.Log("cockout");
+                    Debug.Log("Nothing found in range");
                 }
-                
-                // Get colliders
-                
-                Debug.Log("Interact");
-                
-                // Disable the interact
+
                 _input.interact = false;
                 _interactTimer = 0.0f;
             }
+        }
+        private void OnDrawGizmos()
+        {
+            Vector3 origin = transform.position;
+            Vector3 direction = transform.forward;
 
+            Ray ray = new Ray(origin, direction);
+
+            if (Physics.SphereCast(ray, interactRadius, out RaycastHit hit, interactRadius, interactMask))
+            {
+                // Hit something
+                Gizmos.color = Color.green;
+        
+                // Draw sphere at origin
+                Gizmos.DrawWireSphere(origin, interactRadius);
+        
+                // Draw line from origin to hit point
+                Gizmos.DrawLine(origin, origin + direction * hit.distance);
+        
+                // Draw sphere at hit point
+                Gizmos.DrawWireSphere(origin + direction * hit.distance, interactRadius);
+
+                // Highlight if interactable
+                if (hit.collider.gameObject.GetComponent<IInteractable>() != null)
+                {
+                    Gizmos.color = Color.yellow;
+                    Gizmos.DrawWireCube(hit.collider.bounds.center, hit.collider.bounds.size);
+                }
+            }
+            else
+            {
+                // Nothing hit
+                Gizmos.color = Color.red;
+        
+                // Draw sphere at origin
+                Gizmos.DrawWireSphere(origin, interactRadius);
+        
+                // Draw line at full length
+                Gizmos.DrawLine(origin, origin + direction * interactRadius);
+        
+                // Draw sphere at max distance
+                Gizmos.DrawWireSphere(origin + direction * interactRadius, interactRadius);
+            }
         }
         
     }
