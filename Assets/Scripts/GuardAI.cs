@@ -287,7 +287,12 @@ public class GuardAI : MonoBehaviour
         {
             Debug.Log("Attacking player!");
             attackTimer = 0;
-            player.GetComponent<PlayerHealth>().TakeDamage(attackDamage);
+            
+            if (player.GetComponent<PlayerHealth>() == null) return;
+            else
+            {
+                player.GetComponent<PlayerHealth>().TakeDamage(attackDamage);
+            }
         }
         
         // Once in range, attack player

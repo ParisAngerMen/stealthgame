@@ -73,6 +73,7 @@ namespace StarterAssets
         [Header("Cinemachine")]
         [Tooltip("The follow target set in the Cinemachine Virtual Camera that the camera will follow")]
         public GameObject CinemachineCameraTarget;
+        [SerializeField] private Camera PlayerCamera;
 
         [Tooltip("How far in degrees can you move the camera up")]
         public float TopClamp = 70.0f;
@@ -93,6 +94,7 @@ namespace StarterAssets
         [Header("Interaction")] [Tooltip("To interact with")] 
         [SerializeField] private LayerMask interactMask;
         [SerializeField] private Transform interactTransform;
+        [SerializeField] private GameObject interactPrompt;
 
         // cinemachine
         private float _cinemachineTargetYaw;
@@ -468,7 +470,7 @@ namespace StarterAssets
         {
             _interactTimer += Time.deltaTime;
 
-            if (_input.interact && _interactTimer >= interactCooldown)
+            if (_interactTimer >= interactCooldown)
             {
                 // Get all colliders in range
                 Collider[] colliders = Physics.OverlapSphere(
@@ -498,6 +500,9 @@ namespace StarterAssets
                                 closestDistance = distance;
                                 closestInteractable = interactable;
                             }
+                            
+                            interactPrompt.SetActive(true);
+                            interactPrompt.transform.position = PlayerCamera.WorldToScreenPoint(col.transform.position); 
                     
                             Debug.Log("Found interactable: " + col.gameObject.name);
                         }
@@ -505,11 +510,12 @@ namespace StarterAssets
                         {
                             Debug.Log("Not interactable: " + col.gameObject.name + 
                                       " on layer: " + LayerMask.LayerToName(col.gameObject.layer));
+                            interactPrompt.SetActive(false);
                         }
                     }
 
                     // Interact with closest
-                    if (closestInteractable != null)
+                    if (closestInteractable != null && _input.interact)
                     {
                         closestInteractable.Interact();
                     }
