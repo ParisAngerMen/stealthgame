@@ -1,12 +1,11 @@
-﻿using Unity.Mathematics;
+﻿
+using Unity.Cinemachine; // <-- New namespace
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Serialization;
 #if ENABLE_INPUT_SYSTEM 
 using UnityEngine.InputSystem;
 #endif
-
-/* Note: animations are called via the controller for both the character and capsule using animator null checks
- */
 
 namespace StarterAssets
 {
@@ -71,7 +70,7 @@ namespace StarterAssets
         public LayerMask GroundLayers;
 
         [Header("Cinemachine")]
-        [Tooltip("The follow target set in the Cinemachine Virtual Camera that the camera will follow")]
+        [Tooltip("The follow target set in the Cinemachine Camera that the camera will follow")]
         public GameObject CinemachineCameraTarget;
         [SerializeField] private Camera PlayerCamera;
 
@@ -81,17 +80,21 @@ namespace StarterAssets
         [Tooltip("How far in degrees can you move the camera down")]
         public float BottomClamp = -30.0f;
 
-        [Tooltip("Additional degress to override the camera. Useful for fine tuning camera position when locked")]
+        [Tooltip("Additional degrees to override the camera. Useful for fine tuning camera position when locked")]
         public float CameraAngleOverride = 0.0f;
 
         [Tooltip("For locking the camera position on all axis")]
         public bool LockCameraPosition = false;
 
+        [Tooltip("Camera sensitivity")]
+        public float CameraSensitivity = 1.0f;
+
         public bool isMakingNoise;
         public float interactCooldown = 1.0f;
         public float interactRadius = 10.0f;
 
-        [Header("Interaction")] [Tooltip("To interact with")] 
+        [Header("Interaction")]
+        [Tooltip("To interact with")] 
         [SerializeField] private LayerMask interactMask;
         [SerializeField] private Transform interactTransform;
         [SerializeField] private GameObject interactPrompt;
@@ -126,8 +129,12 @@ namespace StarterAssets
         private Animator _animator;
         private CharacterController _controller;
         private StarterAssetsInputs _input;
-        private GameObject _mainCamera;
+        public GameObject _mainCamera;
         public CapsuleCollider _noiseCollider;
+        
+        private CinemachineFollow _transposer;
+        private Vector3 _followOffset;
+
 
         private const float _threshold = 0.01f;
 
@@ -140,20 +147,17 @@ namespace StarterAssets
 #if ENABLE_INPUT_SYSTEM
                 return _playerInput.currentControlScheme == "KeyboardMouse";
 #else
-				return false;
+                return false;
 #endif
             }
         }
 
-
         private void Awake()
         {
-            // get a reference to our main camera
             if (_mainCamera == null)
             {
                 _mainCamera = GameObject.FindGameObjectWithTag("MainCamera");
             }
-
         }
 
         private void Start()
@@ -163,15 +167,16 @@ namespace StarterAssets
             _hasAnimator = TryGetComponent(out _animator);
             _controller = GetComponent<CharacterController>();
             _input = GetComponent<StarterAssetsInputs>();
-#if ENABLE_INPUT_SYSTEM 
+
+#if ENABLE_INPUT_SYSTEM
             _playerInput = GetComponent<PlayerInput>();
+            // Remove _transposer and _followOffset lines
 #else
-			Debug.LogError( "Starter Assets package is missing dependencies. Please use Tools/Starter Assets/Reinstall Dependencies to fix it");
+    Debug.LogError("Starter Assets package is missing dependencies.");
 #endif
 
             AssignAnimationIDs();
 
-            // reset our timeouts on start
             _jumpTimeoutDelta = JumpTimeout;
             _fallTimeoutDelta = FallTimeout;
         }
@@ -204,68 +209,63 @@ namespace StarterAssets
 
         private void GroundedCheck()
         {
-            // set sphere position, with offset
             Vector3 spherePosition = new Vector3(transform.position.x, transform.position.y - GroundedOffset,
                 transform.position.z);
             Grounded = Physics.CheckSphere(spherePosition, GroundedRadius, GroundLayers,
                 QueryTriggerInteraction.Ignore);
 
-            // update animator if using character
             if (_hasAnimator)
             {
                 _animator.SetBool(_animIDGrounded, Grounded);
             }
         }
 
+        /// <summary>
+        /// Cinemachine 3 compatible camera rotation.
+        /// We rotate the CinemachineCameraTarget transform directly.
+        /// The CinemachineCamera follows this target automatically.
+        /// </summary>
         private void CameraRotation()
         {
-            // if there is an input and camera position is not fixed
             if (_input.look.sqrMagnitude >= _threshold && !LockCameraPosition)
             {
-                //Don't multiply mouse input by Time.deltaTime;
-                float deltaTimeMultiplier = IsCurrentDeviceMouse ? 1.0f : Time.deltaTime;
+                // Mouse does not use deltaTime, controller does
+                float deltaTimeMultiplier = IsCurrentDeviceMouse ? CameraSensitivity : Time.deltaTime * CameraSensitivity;
 
                 _cinemachineTargetYaw += _input.look.x * deltaTimeMultiplier;
                 _cinemachineTargetPitch += _input.look.y * deltaTimeMultiplier;
             }
 
-            // clamp our rotations so our values are limited 360 degrees
+            // Clamp rotations so we don't spin infinitely or break pitch
             _cinemachineTargetYaw = ClampAngle(_cinemachineTargetYaw, float.MinValue, float.MaxValue);
             _cinemachineTargetPitch = ClampAngle(_cinemachineTargetPitch, BottomClamp, TopClamp);
 
-            // Cinemachine will follow this target
-            CinemachineCameraTarget.transform.rotation = Quaternion.Euler(_cinemachineTargetPitch + CameraAngleOverride,
-                _cinemachineTargetYaw, 0.0f);
+            // Actually apply the rotation to the camera target transform
+            // Cinemachine 3 reads this transform's rotation to orient the camera
+            CinemachineCameraTarget.transform.rotation = Quaternion.Euler(
+                _cinemachineTargetPitch + CameraAngleOverride,
+                _cinemachineTargetYaw,
+                0.0f
+            );
         }
 
         private void Move()
         {
-            // set target speed based on move speed, sprint speed and if sprint is pressed
             float targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
             targetSpeed = _input.crouch ? CrouchSpeed : targetSpeed;
 
-            // a simplistic acceleration and deceleration designed to be easy to remove, replace, or iterate upon
-
-            // note: Vector2's == operator uses approximation so is not floating point error prone, and is cheaper than magnitude
-            // if there is no input, set the target speed to 0
             if (_input.move == Vector2.zero) targetSpeed = 0.0f;
 
-            // a reference to the players current horizontal velocity
             float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
 
             float speedOffset = 0.1f;
             float inputMagnitude = _input.analogMovement ? _input.move.magnitude : 1f;
 
-            // accelerate or decelerate to target speed
             if (currentHorizontalSpeed < targetSpeed - speedOffset ||
                 currentHorizontalSpeed > targetSpeed + speedOffset)
             {
-                // creates curved result rather than a linear one giving a more organic speed change
-                // note T in Lerp is clamped, so we don't need to clamp our speed
                 _speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed * inputMagnitude,
                     Time.deltaTime * SpeedChangeRate);
-
-                // round speed to 3 decimal places
                 _speed = Mathf.Round(_speed * 1000f) / 1000f;
             }
             else
@@ -276,11 +276,8 @@ namespace StarterAssets
             _animationBlend = Mathf.Lerp(_animationBlend, targetSpeed, Time.deltaTime * SpeedChangeRate);
             if (_animationBlend < 0.01f) _animationBlend = 0f;
 
-            // normalise input direction
             Vector3 inputDirection = new Vector3(_input.move.x, 0.0f, _input.move.y).normalized;
 
-            // note: Vector2's != operator uses approximation so is not floating point error prone, and is cheaper than magnitude
-            // if there is a move input rotate player when the player is moving
             if (_input.move != Vector2.zero)
             {
                 _targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg +
@@ -288,18 +285,14 @@ namespace StarterAssets
                 float rotation = Mathf.SmoothDampAngle(transform.eulerAngles.y, _targetRotation, ref _rotationVelocity,
                     RotationSmoothTime);
 
-                // rotate to face input direction relative to camera position
                 transform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
             }
 
-
             Vector3 targetDirection = Quaternion.Euler(0.0f, _targetRotation, 0.0f) * Vector3.forward;
 
-            // move the player
             _controller.Move(targetDirection.normalized * (_speed * Time.deltaTime) +
                              new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
 
-            // update animator if using character
             if (_hasAnimator)
             {
                 _animator.SetFloat(_animIDSpeed, _animationBlend);
@@ -310,12 +303,10 @@ namespace StarterAssets
             {
                 noiseRadius = 0;
             }
-
             else
             {
                 noiseRadius = _speed * noiseMultiplier;
             }
-            
         }
 
         private void Crouch()
@@ -324,19 +315,10 @@ namespace StarterAssets
             {
                 if (_input.crouch)
                 {
-                    // Crouch logic
                     _speed = CrouchSpeed;
-                    
                     Debug.Log("crouch");
-                    
-                }
-
-                else
-                {
-                    
                 }
             }
-
             else
             {
                 _input.crouch = false;
@@ -347,36 +329,29 @@ namespace StarterAssets
         {
             if (Grounded)
             {
-                // reset the fall timeout timer
                 _fallTimeoutDelta = FallTimeout;
 
-                // update animator if using character
                 if (_hasAnimator)
                 {
                     _animator.SetBool(_animIDJump, false);
                     _animator.SetBool(_animIDFreeFall, false);
                 }
 
-                // stop our velocity dropping infinitely when grounded
                 if (_verticalVelocity < 0.0f)
                 {
                     _verticalVelocity = -2f;
                 }
 
-                // Jump
                 if (_input.jump && _jumpTimeoutDelta <= 0.0f)
                 {
-                    // the square root of H * -2 * G = how much velocity needed to reach desired height
                     _verticalVelocity = Mathf.Sqrt(JumpHeight * -2f * Gravity);
 
-                    // update animator if using character
                     if (_hasAnimator)
                     {
                         _animator.SetBool(_animIDJump, true);
                     }
                 }
 
-                // jump timeout
                 if (_jumpTimeoutDelta >= 0.0f)
                 {
                     _jumpTimeoutDelta -= Time.deltaTime;
@@ -384,28 +359,23 @@ namespace StarterAssets
             }
             else
             {
-                // reset the jump timeout timer
                 _jumpTimeoutDelta = JumpTimeout;
 
-                // fall timeout
                 if (_fallTimeoutDelta >= 0.0f)
                 {
                     _fallTimeoutDelta -= Time.deltaTime;
                 }
                 else
                 {
-                    // update animator if using character
                     if (_hasAnimator)
                     {
                         _animator.SetBool(_animIDFreeFall, true);
                     }
                 }
 
-                // if we are not grounded, do not jump
                 _input.jump = false;
             }
 
-            // apply gravity over time if under terminal (multiply by delta time twice to linearly speed up over time)
             if (_verticalVelocity < _terminalVelocity)
             {
                 _verticalVelocity += Gravity * Time.deltaTime;
@@ -432,7 +402,6 @@ namespace StarterAssets
             if (Grounded) Gizmos.color = transparentGreen;
             else Gizmos.color = transparentRed;
 
-            // when selected, draw a gizmo in the position of, and matching radius of, the grounded collider
             Gizmos.DrawSphere(
                 new Vector3(transform.position.x, transform.position.y - GroundedOffset, transform.position.z),
                 GroundedRadius);            
@@ -440,14 +409,12 @@ namespace StarterAssets
             Gizmos.DrawSphere(
                 new Vector3(transform.position.x, transform.position.y - GroundedOffset, transform.position.z),
                 noiseRadius);
-            
         }
 
         private void OnFootstep(AnimationEvent animationEvent)
         {
             if (animationEvent.animatorClipInfo.weight > 0.5f)
             {
-
                 if (AudioFootsteps != null)
                     AudioFootsteps.Play();
                 
@@ -462,7 +429,6 @@ namespace StarterAssets
             {
                 if (LandingAudio != null)
                     LandingAudio.Play();
-
             }
         }
 
@@ -472,25 +438,19 @@ namespace StarterAssets
 
             if (_interactTimer >= interactCooldown)
             {
-                // Get all colliders in range
                 Collider[] colliders = Physics.OverlapSphere(
                     interactTransform.position + interactTransform.forward * interactRadius,
                     interactRadius,
                     interactMask
                 );
 
-                // Debug how many were found
-                Debug.Log("Colliders found: " + colliders.Length);
-
                 if (colliders.Length > 0)
                 {
-                    // Find closest interactable
                     float closestDistance = Mathf.Infinity;
                     IInteractable closestInteractable = null;
 
                     foreach (Collider col in colliders)
                     {
-                        // Check if it has IInteractable
                         if (col.TryGetComponent<IInteractable>(out IInteractable interactable))
                         {
                             float distance = Vector3.Distance(transform.position, col.transform.position);
@@ -502,19 +462,14 @@ namespace StarterAssets
                             }
                             
                             interactPrompt.SetActive(true);
-                            interactPrompt.transform.position = PlayerCamera.WorldToScreenPoint(col.transform.position); 
-                    
-                            Debug.Log("Found interactable: " + col.gameObject.name);
+                            interactPrompt.transform.position = PlayerCamera.WorldToScreenPoint(col.transform.position);
                         }
                         else
                         {
-                            Debug.Log("Not interactable: " + col.gameObject.name + 
-                                      " on layer: " + LayerMask.LayerToName(col.gameObject.layer));
                             interactPrompt.SetActive(false);
                         }
                     }
 
-                    // Interact with closest
                     if (closestInteractable != null && _input.interact)
                     {
                         closestInteractable.Interact();
@@ -522,56 +477,42 @@ namespace StarterAssets
                 }
                 else
                 {
-                    Debug.Log("Nothing found in range");
+                    interactPrompt.SetActive(false);
                 }
 
                 _input.interact = false;
                 _interactTimer = 0.0f;
             }
         }
+
         private void OnDrawGizmos()
         {
-            Vector3 origin = transform.position;
-            Vector3 direction = transform.forward;
+            if (interactTransform == null) return;
 
-            Ray ray = new Ray(origin, direction);
+            Vector3 origin = interactTransform.position;
+            Vector3 center = origin + interactTransform.forward * interactRadius;
 
-            if (Physics.SphereCast(ray, interactRadius, out RaycastHit hit, interactRadius, interactMask))
+            Collider[] colliders = Physics.OverlapSphere(center, interactRadius, interactMask);
+
+            if (colliders.Length > 0)
             {
-                // Hit something
                 Gizmos.color = Color.green;
-        
-                // Draw sphere at origin
-                Gizmos.DrawWireSphere(origin, interactRadius);
-        
-                // Draw line from origin to hit point
-                Gizmos.DrawLine(origin, origin + direction * hit.distance);
-        
-                // Draw sphere at hit point
-                Gizmos.DrawWireSphere(origin + direction * hit.distance, interactRadius);
+                Gizmos.DrawWireSphere(center, interactRadius);
 
-                // Highlight if interactable
-                if (hit.collider.gameObject.GetComponent<IInteractable>() != null)
+                foreach (Collider col in colliders)
                 {
-                    Gizmos.color = Color.yellow;
-                    Gizmos.DrawWireCube(hit.collider.bounds.center, hit.collider.bounds.size);
+                    if (col.GetComponent<IInteractable>() != null)
+                    {
+                        Gizmos.color = Color.yellow;
+                        Gizmos.DrawWireCube(col.bounds.center, col.bounds.size);
+                    }
                 }
             }
             else
             {
-                // Nothing hit
                 Gizmos.color = Color.red;
-        
-                // Draw sphere at origin
-                Gizmos.DrawWireSphere(origin, interactRadius);
-        
-                // Draw line at full length
-                Gizmos.DrawLine(origin, origin + direction * interactRadius);
-        
-                // Draw sphere at max distance
-                Gizmos.DrawWireSphere(origin + direction * interactRadius, interactRadius);
+                Gizmos.DrawWireSphere(center, interactRadius);
             }
         }
-        
     }
 }
