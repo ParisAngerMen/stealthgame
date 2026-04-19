@@ -20,7 +20,6 @@ public class PlayerHealth : MonoBehaviour
     {
         Debug.Log("Health: " + curHealth);
         slider.value = curHealth;
-
     }
 
     public void HealPlayer(float amount)

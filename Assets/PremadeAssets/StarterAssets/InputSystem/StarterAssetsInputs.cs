@@ -14,6 +14,8 @@ namespace StarterAssets
 		public bool sprint;
 		public bool crouch;
 		public bool interact;
+		public bool aim;
+		public bool attack;
 
 		[Header("Movement Settings")]
 		public bool analogMovement;
@@ -49,20 +51,42 @@ namespace StarterAssets
 		public void OnCrouch(InputValue value)
 		{
 			CrouchInput(value.isPressed);
-			Debug.Log("is crocuhing");
 		}
 
 		public void OnInteract(InputValue value)
 		{
 			InteractInput(value.isPressed);
+		}		
+		
+		public void OnAim(InputValue value)
+		{
+			AimInput(value.isPressed);
+			Debug.Log("is aiming");
 		}
+
+		public void OnAttack(InputValue value)
+		{
+			AttackInput(value.isPressed);
+		}
+		
 #endif
 
 
 		public void MoveInput(Vector2 newMoveDirection)
 		{
 			move = newMoveDirection;
-		} 
+		} 		
+		
+		public void AimInput(bool newAimState)
+		{
+			aim = newAimState;
+			Debug.Log("Aim: "  + aim);
+		}
+
+		public void AttackInput(bool newAttackState)
+		{
+			attack  = newAttackState;
+		}
 
 		public void LookInput(Vector2 newLookDirection)
 		{

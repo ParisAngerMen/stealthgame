@@ -4,7 +4,7 @@ using FOV;
 using UnityEngine.AI;
 using Random = UnityEngine.Random;
 
-public class GuardAI : MonoBehaviour
+public class GuardAI : MonoBehaviour, IInteractable
 {
     #region Variables
     private FieldOfView fov;
@@ -31,6 +31,10 @@ public class GuardAI : MonoBehaviour
     [SerializeField] private float attackDamage = 10f;
     [SerializeField] private float attackCooldown = 5f;
 
+    [Header("Health")]
+    [SerializeField] private float maxHealth = 100f;
+    private float curHealth;
+    
     // Timers
     private float waitTimer = 0f;
     private float searchTimer = 0f;
@@ -74,13 +78,13 @@ public class GuardAI : MonoBehaviour
         }
 
         GoToWaypoint();
+        curHealth = maxHealth;
     }
 
     private void Update()
     {
         // Tick cooldowns
         if (searchCooldown > 0f) searchCooldown -= Time.deltaTime;
-        if (hearingCooldown > 0f) hearingCooldown -= Time.deltaTime;
 
         // Update FOV detection every frame
         fov.Field<Transform>("Player");
@@ -89,11 +93,12 @@ public class GuardAI : MonoBehaviour
         Debug.Log("chase timer: " + chaseTimer);
     }
 
-    private void OnTriggerStay(Collider other)
+    /*
+    public void OnTriggerStay(Collider other)
     {
         // Cooldown prevents spam calling every frame
         if (hearingCooldown > 0f) return;
-        if (!other.CompareTag("Player")) return;
+        if (!other.CompareTag("Player")) Debug.Log("tag: " + other.tag);
 
         // Dont interrupt chase or investigate
         if (currentState == GuardState.Chasing) return;
@@ -103,6 +108,7 @@ public class GuardAI : MonoBehaviour
         Debug.Log("Hearing player!");
         agent.SetDestination(other.transform.position);
     }
+    */
     #endregion
 
     #region State Machine
@@ -335,4 +341,30 @@ public class GuardAI : MonoBehaviour
         return false;
     }
     #endregion
+
+    public void TakeDamage(float damage, Transform objectPos)
+    {
+        agent.isStopped = true;
+        SearchForPlayer(objectPos.position);
+        curHealth -= damage;
+
+        if (curHealth <= 0)
+        {
+            Die();
+        }
+    }
+
+    public void Interact()
+    {
+        if (!isChasingPlayer)
+        {
+            Debug.Log("Die");
+            Die();
+        }
+    }
+
+    private void Die()
+    {
+        Destroy(this.gameObject);
+    }
 }
