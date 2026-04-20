@@ -688,6 +688,11 @@ namespace StarterAssets
                 if (col.gameObject.layer == 7)
                 {
                     interactText.text = "Stealth Kill";
+
+                    if (col.gameObject.GetComponent<GuardAI>().isChasingPlayer)
+                    {
+                        interactPrompt.SetActive(false);
+                    }
                 }
 
                 else

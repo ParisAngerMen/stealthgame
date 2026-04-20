@@ -73,7 +73,6 @@ public class GuardAI : MonoBehaviour, IInteractable
     {
         if (waypoints == null || waypoints.Length == 0)
         {
-            Debug.LogError("No waypoints assigned to " + gameObject.name);
             return;
         }
 
