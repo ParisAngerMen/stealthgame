@@ -265,7 +265,7 @@ public class GuardAI : MonoBehaviour, IInteractable
     private void NextWaypoint()
     {
         waypointIndex++;
-
+    
         if (waypointIndex >= waypoints.Length)
         {
             waypointIndex = 0;
