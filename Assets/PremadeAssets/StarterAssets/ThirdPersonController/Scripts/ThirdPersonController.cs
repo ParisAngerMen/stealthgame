@@ -160,6 +160,7 @@ namespace StarterAssets
         
         private bool _isAiming = false;
         private Vector3 _aimPoint;
+        public bool hasKey = false;
 
         // ============================================================
         // PUBLIC FIELDS
@@ -684,7 +685,7 @@ namespace StarterAssets
                     _currentInteractTarget = col.transform;
                 }
 
-                if (col.gameObject.layer == 6)
+                if (col.gameObject.layer == 7)
                 {
                     interactText.text = "Stealth Kill";
                 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using StarterAssets;
 using UnityEngine;
 
 public class DoorScript : MonoBehaviour, IInteractable
@@ -8,6 +9,7 @@ public class DoorScript : MonoBehaviour, IInteractable
     [SerializeField] private Vector3 openPosition;
     [SerializeField] private Vector3 closePosition;
     [SerializeField] private float moveSpeed = 2f;
+    [SerializeField] private ThirdPersonController player;
 
     private bool isOpen = false;
     private bool isMoving = false;
@@ -22,6 +24,11 @@ public class DoorScript : MonoBehaviour, IInteractable
 
     public void Interact()
     {
+        if (player.hasKey)
+        {
+            isBlocked = !isBlocked;
+        }
+        
         if (isBlocked) return;
         if (isMoving) return;  // Prevent spam clicking while moving
 
