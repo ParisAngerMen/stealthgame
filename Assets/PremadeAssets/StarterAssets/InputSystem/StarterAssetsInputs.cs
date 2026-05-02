@@ -15,6 +15,8 @@ namespace StarterAssets
 		public bool crouch;
 		public bool interact;
 		public bool aim;
+		public bool scrollUp;
+		public bool scrollDown;
 		public bool attack;
 
 		[Header("Movement Settings")]
@@ -67,6 +69,13 @@ namespace StarterAssets
 		public void OnAttack(InputValue value)
 		{
 			AttackInput(value.isPressed);
+		}
+		
+		public void OnScrollWeapon(InputValue value)
+		{
+			float scroll = value.Get<float>();
+			scrollUp = scroll > 0;
+			scrollDown = scroll < 0;
 		}
 		
 #endif

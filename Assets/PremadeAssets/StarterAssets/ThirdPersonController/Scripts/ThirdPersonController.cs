@@ -158,6 +158,12 @@ namespace StarterAssets
         [Tooltip("Max aim raycast distance")]
         [SerializeField] private float aimDistance = 100f;
         
+        [Header("Climbing")]
+        [SerializeField] private LadderClimber ladderClimber;
+        
+        [Header("Weapon")]
+        [SerializeField] private WeaponManager weaponManager;
+        
         private bool _isAiming = false;
         private Vector3 _aimPoint;
         public bool hasKey = false;
@@ -269,6 +275,16 @@ namespace StarterAssets
         {
             _hasAnimator = TryGetComponent(out _animator);
 
+            // Always allow interaction
+            FindClosestInteractable();
+            HandleInteractInput();
+
+            // Skip normal movement while climbing
+            if (ladderClimber != null && ladderClimber.IsClimbing)
+            {
+                return;
+            }
+
             JumpAndGravity();
             GroundedCheck();
             Crouch();
@@ -276,8 +292,6 @@ namespace StarterAssets
             Attack();
             Move();
             EmitNoise();
-            FindClosestInteractable();
-            HandleInteractInput();
         }
 
         private void LateUpdate()
@@ -326,6 +340,8 @@ namespace StarterAssets
 
         private void Move()
         {
+            if (!_controller.enabled) return;
+            
             float targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
             targetSpeed = _input.crouch ? CrouchSpeed : targetSpeed;
 
@@ -416,12 +432,9 @@ namespace StarterAssets
 
         private void Aim()
         {
-            // Get the center of the screen
             Vector2 screenCenter = new Vector2(Screen.width / 2f, Screen.height / 2f);
-
-            // Raycast from the center of the screen into the world
             Ray ray = PlayerCamera.ScreenPointToRay(screenCenter);
-    
+
             if (Physics.Raycast(ray, out RaycastHit hit, aimDistance, aimMask))
             {
                 _aimPoint = hit.point;
@@ -433,21 +446,27 @@ namespace StarterAssets
 
             if (_input.aim)
             {
-                pistolSprite.SetActive(true);
-                
                 _isAiming = true;
 
-                // Enable aim camera
                 if (aimCamera != null)
                     aimCamera.Priority = 20;
 
-                // Show crosshair
-                if (crosshair != null)
+                if (crosshair != null && !weaponManager.IsScoped)
                     crosshair.gameObject.SetActive(true);
+                else if (crosshair != null)
+                    crosshair.gameObject.SetActive(false);
+
+                // Tell weapon manager we're aiming
+                if (weaponManager != null)
+                    weaponManager.SetAiming(true);
+
+                // Hold breath with sprint key while aiming
+                if (weaponManager != null)
+                    weaponManager.SetHoldBreath(_input.sprint);
 
                 // Rotate player toward aim direction
                 Vector3 aimDirection = _aimPoint - transform.position;
-                aimDirection.y = 0f; // Keep rotation horizontal
+                aimDirection.y = 0f;
                 aimDirection.Normalize();
 
                 if (aimDirection.sqrMagnitude > 0.01f)
@@ -461,32 +480,41 @@ namespace StarterAssets
             }
             else
             {
-                pistolSprite.SetActive(false);
                 _isAiming = false;
 
-                // Disable aim camera
                 if (aimCamera != null)
                     aimCamera.Priority = 0;
 
-                // Hide crosshair
                 if (crosshair != null)
                     crosshair.gameObject.SetActive(false);
-            }
-        }
 
-        private void Attack()
-        {
-            if (_input.attack && _input.aim)
-            {
-                if (pistol != null)
+                if (weaponManager != null)
                 {
-                    Debug.Log("shoot");
-                    pistol.TryShoot();
-                }            
+                    weaponManager.SetAiming(false);
+                    weaponManager.SetHoldBreath(false);
+                }
             }
             
-            _input.attack  = false;
+            if (_isAiming && (_input.scrollUp || _input.scrollDown))
+            {
+                if (weaponManager != null)
+                    weaponManager.CycleZoom();
 
+                _input.scrollUp = false;
+                _input.scrollDown = false;
+            }
+        }
+        private void Attack()
+        {
+            if (_isAiming && _input.attack)
+            {
+                if (weaponManager != null)
+                {
+                    weaponManager.TryShoot();
+                }
+            }
+
+            _input.attack = false;
         }
 
         // ============================================================
